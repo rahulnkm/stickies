@@ -42,10 +42,11 @@ final class NoteStore: ObservableObject {
         return note
     }
 
-    func update(id: UUID, text: String? = nil, frame: CGRect? = nil) {
+    func update(id: UUID, text: String? = nil, frame: CGRect? = nil, tintStyle: NoteTintStyle? = nil) {
         guard let idx = notes.firstIndex(where: { $0.id == id }) else { return }
         if let text { notes[idx].text = text }
         if let frame { notes[idx].frame = NoteFrame(frame) }
+        if let tintStyle { notes[idx].tintStyle = tintStyle }
         notes[idx].updatedAt = Date()
         scheduleWrite(for: id)
     }
