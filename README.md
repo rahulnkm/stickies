@@ -17,3 +17,5 @@ open Stickies.xcodeproj
 
 MIT — see [`LICENSE`](LICENSE).
 
+Bundles [Geist Mono](https://github.com/vercel/geist-font) by Vercel under the SIL Open Font License 1.1 — see [`Stickies/Fonts/GeistMono-OFL.txt`](Stickies/Fonts/GeistMono-OFL.txt).
+
