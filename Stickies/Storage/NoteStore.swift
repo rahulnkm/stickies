@@ -61,8 +61,6 @@ final class NoteStore: ObservableObject {
     func undelete(id: UUID) -> Note? {
         guard let note = pendingDeletions.removeValue(forKey: id) else { return nil }
         notes.append(note)
-        // Disk file was never removed, no write needed. Update just in case.
-        scheduleWrite(for: id)
         return note
     }
 
@@ -76,10 +74,11 @@ final class NoteStore: ObservableObject {
         for (id, work) in pendingWrites {
             work.cancel()
             if let note = notes.first(where: { $0.id == id }) {
-                writeNow(note)
+                Self.writeNow(note, notesDir: notesDir, logger: logger)
             }
         }
         pendingWrites.removeAll()
+        queue.sync {}  // block until any in-flight work item finishes
     }
 
     // MARK: - Cascade placement
@@ -148,9 +147,11 @@ final class NoteStore: ObservableObject {
 
     private func scheduleWrite(for id: UUID) {
         cancelPendingWrite(for: id)
-        let work = DispatchWorkItem { [weak self] in
-            guard let self, let note = self.notes.first(where: { $0.id == id }) else { return }
-            self.writeNow(note)
+        guard let note = notes.first(where: { $0.id == id }) else { return }
+        let dir = notesDir
+        let log = logger
+        let work = DispatchWorkItem {
+            Self.writeNow(note, notesDir: dir, logger: log)
         }
         pendingWrites[id] = work
         queue.asyncAfter(deadline: .now() + Self.debounceInterval, execute: work)
@@ -162,18 +163,18 @@ final class NoteStore: ObservableObject {
         }
     }
 
-    private func writeNow(_ note: Note) {
+    private static func writeNow(_ note: Note, notesDir: URL, logger: Logger) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        let url = fileURL(for: note.id)
+        let url = notesDir.appendingPathComponent("\(note.id.uuidString).json")
         let tmp = url.appendingPathExtension("tmp")
         do {
             let data = try encoder.encode(note)
             try data.write(to: tmp, options: .atomic)
-            _ = try? FileManager.default.replaceItemAt(url, withItemAt: tmp)
+            try FileManager.default.replaceItemAt(url, withItemAt: tmp)
         } catch {
-            logger.error("Failed to write note \(note.id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+            logger.error("Write failed for \(note.id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
         }
     }
 
