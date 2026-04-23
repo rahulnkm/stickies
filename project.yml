@@ -20,6 +20,11 @@ targets:
     platform: macOS
     sources:
       - path: Stickies
+        excludes:
+          - "Fonts/**"
+      - path: Stickies/Fonts
+        type: folder
+        buildPhase: resources
     info:
       path: Stickies/Info.plist
       properties:
@@ -36,6 +41,7 @@ targets:
         LSMinimumSystemVersion: "13.0"
         NSHumanReadableCopyright: ""
         NSPrincipalClass: NSApplication
+        ATSApplicationFontsPath: "Fonts"
     entitlements:
       path: Stickies/Stickies.entitlements
     settings:

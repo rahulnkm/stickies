@@ -1,6 +1,14 @@
 import AppKit
 import SwiftUI
 
+/// Titled `NSWindow` subclass that hides its title bar for a sticky-note look
+/// while preserving NSWindow's native edge-resize and drag handling. Plain
+/// `.borderless` windows lose both.
+final class KeyableStickyWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
 final class NoteWindowController: NSWindowController, NSWindowDelegate {
 
     let noteID: UUID
@@ -15,18 +23,26 @@ final class NoteWindowController: NSWindowController, NSWindowDelegate {
         let initialFrame = store.notes.first(where: { $0.id == noteID })?.frame.cgRect
             ?? CGRect(x: 120, y: 340, width: 240, height: 240)
 
-        let window = NSWindow(
+        let window = KeyableStickyWindow(
             contentRect: initialFrame,
-            styleMask: [.borderless, .resizable],
+            styleMask: [.titled, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.standardWindowButton(.closeButton)?.isHidden = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = true
         window.isMovableByWindowBackground = true
+        // Always-on-top over other apps. Floating-level windows still show up
+        // in Mission Control on macOS 13+ (grouped at the bottom).
         window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // Stays on the space it was created in — do NOT set .canJoinAllSpaces.
+        window.collectionBehavior = [.managed, .participatesInCycle]
         window.minSize = NSSize(width: 160, height: 140)
         window.contentMinSize = NSSize(width: 160, height: 140)
 
