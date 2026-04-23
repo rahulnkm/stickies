@@ -1,13 +1,11 @@
 import AppKit
 import SwiftUI
-import Combine
 
 final class NoteWindowController: NSWindowController, NSWindowDelegate {
 
     let noteID: UUID
     private unowned let store: NoteStore
     private let onClose: (UUID) -> Void
-    private var cancellables = Set<AnyCancellable>()
 
     init(noteID: UUID, store: NoteStore, onClose: @escaping (UUID) -> Void) {
         self.noteID = noteID
@@ -53,7 +51,8 @@ final class NoteWindowController: NSWindowController, NSWindowDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
 
     func show() {
-        window?.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
     }
 
     func close(persistFrame: Bool = true) {
