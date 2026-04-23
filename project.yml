@@ -22,6 +22,20 @@ targets:
       - path: Stickies
     info:
       path: Stickies/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: en
+        CFBundleDisplayName: Stickies
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIconFile: ""
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: Stickies
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "13.0"
+        NSHumanReadableCopyright: ""
+        NSPrincipalClass: NSApplication
     entitlements:
       path: Stickies/Stickies.entitlements
     settings:
