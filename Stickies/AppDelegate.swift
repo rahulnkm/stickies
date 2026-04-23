@@ -4,11 +4,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     let store = NoteStore()
     private var controllers: [UUID: NoteWindowController] = [:]
-    // MenuBarController is added in Task 8.
-    // UndoToast wiring is added in Task 10.
+    private var menuBar: MenuBarController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+
+        menuBar = MenuBarController(onNewNote: { [weak self] in
+            self?.createNote()
+        })
 
         for note in store.notes {
             openWindow(for: note.id)
@@ -23,7 +26,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    // MARK: - Window management (used by MenuBarController and delete flow)
+    // MARK: - Public actions
+
+    func createNote() {
+        let note = store.newNote()
+        openWindow(for: note.id)
+    }
+
+    // MARK: - Window management
 
     func openWindow(for id: UUID) {
         guard controllers[id] == nil else {
