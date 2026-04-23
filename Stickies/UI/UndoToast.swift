@@ -7,14 +7,24 @@ final class UndoToast {
 
     private var panel: NSPanel?
     private var timer: Timer?
+    private var activeCompletion: ((Outcome) -> Void)?
 
     private static let visibleDuration: TimeInterval = 3.0
     private static let size = CGSize(width: 240, height: 44)
     private static let bottomMargin: CGFloat = 48
 
     /// Shows the toast. Calls `completion` exactly once with the outcome.
+    /// If another toast is active, the prior completion is resolved as `.expired`
+    /// (committing the prior deletion) before this one is shown.
     func show(message: String = "Note deleted", completion: @escaping (Outcome) -> Void) {
-        dismiss(outcome: nil) // belt-and-suspenders if somehow already visible
+        // Resolve any previously-active toast as expired so its deletion commits.
+        if let prior = activeCompletion {
+            activeCompletion = nil
+            dismissPanel()
+            prior(.expired)
+        }
+
+        activeCompletion = completion
 
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let origin = CGPoint(
@@ -36,13 +46,11 @@ final class UndoToast {
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.hidesOnDeactivate = false
 
-        var boxed: UndoToastHandle!
-        boxed = UndoToastHandle(onUndo: { [weak self] in
-            self?.dismiss(outcome: .undone)
-            completion(.undone)
+        let handle = UndoToastHandle(onUndo: { [weak self] in
+            self?.fire(.undone)
         })
 
-        let hosting = NSHostingView(rootView: UndoToastView(message: message, handle: boxed))
+        let hosting = NSHostingView(rootView: UndoToastView(message: message, handle: handle))
         hosting.autoresizingMask = [.width, .height]
         p.contentView = hosting
 
@@ -50,18 +58,23 @@ final class UndoToast {
         p.orderFrontRegardless()
 
         timer = Timer.scheduledTimer(withTimeInterval: Self.visibleDuration, repeats: false) { [weak self] _ in
-            self?.dismiss(outcome: .expired)
-            completion(.expired)
+            self?.fire(.expired)
         }
     }
 
-    /// Dismisses without firing completion (internal use).
-    private func dismiss(outcome: Outcome?) {
+    /// Invoke the active completion exactly once with the given outcome, then clean up.
+    private func fire(_ outcome: Outcome) {
+        guard let completion = activeCompletion else { return }
+        activeCompletion = nil
+        dismissPanel()
+        completion(outcome)
+    }
+
+    private func dismissPanel() {
         timer?.invalidate()
         timer = nil
         panel?.orderOut(nil)
         panel = nil
-        _ = outcome // silence unused
     }
 }
 
