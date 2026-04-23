@@ -224,6 +224,9 @@ private struct NoteTextEditor: NSViewRepresentable {
             .foregroundColor: NoteTheme.nsText,
             .paragraphStyle: para,
             .kern: NoteTheme.tracking,
+            // Disable ligatures so Geist Mono doesn't collapse `...` into a
+            // narrower ellipsis ligature that visually overlaps prior glyphs.
+            .ligature: 0,
         ]
     }
 
