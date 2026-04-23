@@ -22,15 +22,6 @@ targets:
       - path: Stickies
     info:
       path: Stickies/Info.plist
-      properties:
-        CFBundleName: Stickies
-        CFBundleDisplayName: Stickies
-        CFBundleIdentifier: com.rahulnkm.stickies
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
-        LSMinimumSystemVersion: "13.0"
-        NSHumanReadableCopyright: ""
-        NSPrincipalClass: NSApplication
     entitlements:
       path: Stickies/Stickies.entitlements
     settings:
