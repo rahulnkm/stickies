@@ -12,3 +12,8 @@ brew install xcodegen
 xcodegen generate
 open Stickies.xcodeproj
 ```
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
+
