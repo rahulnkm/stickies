@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let store = NoteStore()
     private var controllers: [UUID: NoteWindowController] = [:]
     private var menuBar: MenuBarController!
+    private let undoToast = UndoToast()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -26,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    // MARK: - Public actions
+    // MARK: - Actions
 
     func createNote() {
         let note = store.newNote()
@@ -52,10 +53,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controllers.removeValue(forKey: id)
     }
 
-    /// Placeholder — the full delete-with-undo flow lands in Task 10.
+    // MARK: - Delete with undo
+
     private func handleCloseRequested(id: UUID) {
+        // Persist final frame before tear-down so undo restores the exact position.
         closeWindow(for: id, persistFrame: true)
         store.beginDelete(id: id)
-        store.commitDelete(id: id)
+
+        undoToast.show { [weak self] outcome in
+            guard let self else { return }
+            switch outcome {
+            case .undone:
+                if self.store.undelete(id: id) != nil {
+                    self.openWindow(for: id)
+                }
+            case .expired:
+                self.store.commitDelete(id: id)
+            }
+        }
     }
 }
