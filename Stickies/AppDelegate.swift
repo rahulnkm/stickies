@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        LaunchAtLogin.reconcile()
 
         menuBar = MenuBarController(onNewNote: { [weak self] in
             self?.createNote()

@@ -4,7 +4,7 @@ final class MenuBarController {
 
     private let statusItem: NSStatusItem
     private let onNewNote: () -> Void
-    // Launch-at-login menu item is wired in Task 11.
+    private let launchAtLoginItem: NSMenuItem
 
     init(onNewNote: @escaping () -> Void) {
         self.onNewNote = onNewNote
@@ -16,10 +16,10 @@ final class MenuBarController {
             button.image?.isTemplate = true
         }
 
-        statusItem.menu = buildMenu()
-    }
+        self.launchAtLoginItem = NSMenuItem(title: "Launch at Login",
+                                            action: nil,
+                                            keyEquivalent: "")
 
-    private func buildMenu() -> NSMenu {
         let menu = NSMenu()
 
         let new = NSMenuItem(title: "New Note", action: #selector(newNoteAction), keyEquivalent: "n")
@@ -29,14 +29,31 @@ final class MenuBarController {
 
         menu.addItem(.separator())
 
+        launchAtLoginItem.action = #selector(toggleLaunchAtLogin)
+        launchAtLoginItem.target = self
+        menu.addItem(launchAtLoginItem)
+
+        menu.addItem(.separator())
+
         let quit = NSMenuItem(title: "Quit Stickies", action: #selector(quitAction), keyEquivalent: "q")
         quit.keyEquivalentModifierMask = [.command]
         quit.target = self
         menu.addItem(quit)
 
-        return menu
+        statusItem.menu = menu
+        refreshLaunchAtLoginState()
+    }
+
+    private func refreshLaunchAtLoginState() {
+        launchAtLoginItem.state = LaunchAtLogin.userPreference ? .on : .off
     }
 
     @objc private func newNoteAction() { onNewNote() }
+
+    @objc private func toggleLaunchAtLogin() {
+        LaunchAtLogin.userPreference.toggle()
+        refreshLaunchAtLoginState()
+    }
+
     @objc private func quitAction() { NSApp.terminate(nil) }
 }
