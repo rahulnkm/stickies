@@ -5,6 +5,7 @@ struct Note: Codable, Identifiable, Equatable {
     var schemaVersion: Int
     var id: UUID
     var text: String
+    var hasRichBody: Bool
     var frame: NoteFrame
     var tintStyle: NoteTintStyle
     var isHidden: Bool
@@ -13,14 +14,16 @@ struct Note: Codable, Identifiable, Equatable {
 
     init(id: UUID = UUID(),
          text: String = "",
+         hasRichBody: Bool = false,
          frame: NoteFrame,
          tintStyle: NoteTintStyle = .slate,
          isHidden: Bool = false,
          createdAt: Date = .init(),
          updatedAt: Date = .init()) {
-        self.schemaVersion = 2
+        self.schemaVersion = 3
         self.id = id
         self.text = text
+        self.hasRichBody = hasRichBody
         self.frame = frame
         self.tintStyle = tintStyle
         self.isHidden = isHidden
@@ -29,7 +32,7 @@ struct Note: Codable, Identifiable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case schemaVersion, id, text, frame, tintStyle, isHidden, createdAt, updatedAt
+        case schemaVersion, id, text, hasRichBody, frame, tintStyle, isHidden, createdAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -37,6 +40,7 @@ struct Note: Codable, Identifiable, Equatable {
         self.schemaVersion = (try? c.decode(Int.self, forKey: .schemaVersion)) ?? 1
         self.id = try c.decode(UUID.self, forKey: .id)
         self.text = try c.decode(String.self, forKey: .text)
+        self.hasRichBody = (try? c.decode(Bool.self, forKey: .hasRichBody)) ?? false
         self.frame = try c.decode(NoteFrame.self, forKey: .frame)
         self.tintStyle = (try? c.decode(NoteTintStyle.self, forKey: .tintStyle)) ?? .slate
         self.isHidden = (try? c.decode(Bool.self, forKey: .isHidden)) ?? false
