@@ -58,10 +58,12 @@ struct NoteView: View {
             RoundedRectangle(cornerRadius: NoteTheme.cornerRadius, style: .continuous)
                 .fill(NoteTheme.bg.opacity(currentTint.tintOpacity))
 
-            NoteTextEditor(text: Binding(
-                get: { note?.text ?? "" },
-                set: { store.update(id: noteID, text: $0) }
-            ))
+            NoteTextEditor(
+                initialBody: store.body(for: noteID),
+                onChange: { newBody in
+                    store.update(id: noteID, body: newBody)
+                }
+            )
             .padding(.top, NoteTheme.topPadding)
             .padding(.horizontal, NoteTheme.innerPadding)
             .padding(.bottom, NoteTheme.innerPadding)
@@ -173,38 +175,15 @@ private struct BlurView: NSViewRepresentable {
     }
 }
 
-/// Direct NSTextView wrapper so we can zero out its internal insets and apply
-/// the spec's line-height and tracking. `TextEditor` adds ~5pt of lineFragmentPadding
-/// and cannot express either attribute, which made the padding look loose.
+/// Rich-text editor wrapper. Takes an initial NSAttributedString and reports
+/// changes via callback rather than a SwiftUI Binding — NSAttributedString
+/// equality is expensive and a Binding would fight the in-flight text view.
 private struct NoteTextEditor: NSViewRepresentable {
-    @Binding var text: String
+    let initialBody: NSAttributedString
+    let onChange: (NSAttributedString) -> Void
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSTextView.scrollableTextView()
-        guard let tv = scroll.documentView as? NSTextView else { return scroll }
-
-        tv.isRichText = false
-        tv.allowsUndo = true
-        tv.drawsBackground = false
-        tv.backgroundColor = .clear
-        tv.textColor = NoteTheme.nsText
-        tv.insertionPointColor = NoteTheme.nsText
-        tv.font = NoteTheme.font()
-        tv.textContainerInset = .zero
-        tv.textContainer?.lineFragmentPadding = 0
-        tv.isAutomaticQuoteSubstitutionEnabled = false
-        tv.isAutomaticDashSubstitutionEnabled = false
-        tv.isAutomaticSpellingCorrectionEnabled = false
-        tv.isAutomaticTextReplacementEnabled = false
-        tv.isHorizontallyResizable = false
-        tv.isVerticallyResizable = true
-        tv.delegate = context.coordinator
-        tv.typingAttributes = Self.typingAttributes()
-
-        tv.textStorage?.setAttributedString(
-            NSAttributedString(string: text, attributes: Self.typingAttributes())
-        )
-
+        let scroll = NSScrollView()
         scroll.drawsBackground = false
         scroll.backgroundColor = .clear
         scroll.hasVerticalScroller = false
@@ -212,21 +191,47 @@ private struct NoteTextEditor: NSViewRepresentable {
         scroll.automaticallyAdjustsContentInsets = false
         scroll.contentInsets = .init()
 
+        let tv = NoteTextView(frame: .zero)
+        tv.minSize = NSSize(width: 0, height: 0)
+        tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        tv.isVerticallyResizable = true
+        tv.isHorizontallyResizable = false
+        tv.autoresizingMask = [.width]
+        tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        tv.textContainer?.widthTracksTextView = true
+        tv.textContainer?.lineFragmentPadding = 0
+
+        tv.isRichText = true
+        tv.importsGraphics = true
+        tv.allowsImageEditing = false
+        tv.allowsUndo = true
+        tv.drawsBackground = false
+        tv.backgroundColor = .clear
+        tv.textColor = NoteTheme.nsText
+        tv.insertionPointColor = NoteTheme.nsText
+        tv.font = NoteTheme.font()
+        tv.textContainerInset = .zero
+        tv.isAutomaticQuoteSubstitutionEnabled = false
+        tv.isAutomaticDashSubstitutionEnabled = false
+        tv.isAutomaticSpellingCorrectionEnabled = false
+        tv.isAutomaticTextReplacementEnabled = false
+        tv.typingAttributes = Self.typingAttributes()
+        tv.delegate = context.coordinator
+
+        // Seed the body. The store has already promoted any RTFD-decoded
+        // attachments to FitWidthImageAttachment via upgradeAttachments(in:).
+        tv.textStorage?.setAttributedString(initialBody)
+
+        scroll.documentView = tv
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
-        guard let tv = scroll.documentView as? NSTextView else { return }
-        if tv.string != text {
-            let ranges = tv.selectedRanges
-            tv.textStorage?.setAttributedString(
-                NSAttributedString(string: text, attributes: Self.typingAttributes())
-            )
-            tv.selectedRanges = ranges
-        }
+        // Intentional no-op: the NSTextView is the source of truth for the body
+        // in flight. External pushes would fight the user's cursor.
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeCoordinator() -> Coordinator { Coordinator(onChange: onChange) }
 
     static func typingAttributes() -> [NSAttributedString.Key: Any] {
         let para = NSMutableParagraphStyle()
@@ -243,14 +248,13 @@ private struct NoteTextEditor: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: NoteTextEditor
-        init(_ parent: NoteTextEditor) { self.parent = parent }
+        let onChange: (NSAttributedString) -> Void
+        init(onChange: @escaping (NSAttributedString) -> Void) { self.onChange = onChange }
 
         func textDidChange(_ notification: Notification) {
-            guard let tv = notification.object as? NSTextView else { return }
-            if parent.text != tv.string {
-                parent.text = tv.string
-            }
+            guard let tv = notification.object as? NSTextView,
+                  let storage = tv.textStorage else { return }
+            onChange(NSAttributedString(attributedString: storage))
         }
     }
 }
