@@ -2,15 +2,17 @@ import SwiftUI
 import AppKit
 
 enum NoteTheme {
-    static let bg = Color(red: 0x1F/255, green: 0x1D/255, blue: 0x1A/255)
+    static let bg = Color(red: 0x2C/255, green: 0x2A/255, blue: 0x33/255)
     static let text = Color(red: 0xE8/255, green: 0xE3/255, blue: 0xD8/255)
-    static let nsBg = NSColor(red: 0x1F/255, green: 0x1D/255, blue: 0x1A/255, alpha: 1)
+    static let nsBg = NSColor(red: 0x2C/255, green: 0x2A/255, blue: 0x33/255, alpha: 1)
     static let nsText = NSColor(red: 0xE8/255, green: 0xE3/255, blue: 0xD8/255, alpha: 1)
     static let cornerRadius: CGFloat = 6
     static let innerPadding: CGFloat = 16
-    static let topPadding: CGFloat = 30   // extra room so hover-reveal × doesn't collide with the first line
-    static let closeSize: CGFloat = 12
-    static let closeInset: CGFloat = 12
+    static let topPadding: CGFloat = 30   // extra room so hover-reveal button doesn't collide with the first line
+    static let hideSize: CGFloat = 8
+    static let hideInset: CGFloat = 12
+    /// macOS yellow stoplight color (approx).
+    static let hideYellow = Color(red: 0xFE/255, green: 0xBC/255, blue: 0x2E/255)
     static let fontSize: CGFloat = 13
     static let lineHeightMultiple: CGFloat = 1.0
     static let tracking: CGFloat = 0
@@ -26,9 +28,10 @@ enum NoteTheme {
 struct NoteView: View {
     let noteID: UUID
     @ObservedObject var store: NoteStore
-    var onClose: () -> Void
+    var onHide: () -> Void
 
     @State private var topBarHovering = false
+    @State private var hideButtonHovering = false
     @State private var hoverHideTask: DispatchWorkItem?
 
     private var note: Note? { store.notes.first(where: { $0.id == noteID }) }
@@ -93,18 +96,27 @@ struct NoteView: View {
 
                 Spacer()
 
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(NoteTheme.text)
-                        .frame(width: NoteTheme.closeSize, height: NoteTheme.closeSize)
-                        .contentShape(Rectangle())
+                Button(action: onHide) {
+                    ZStack {
+                        Circle()
+                            .fill(NoteTheme.hideYellow)
+                            .frame(width: NoteTheme.hideSize, height: NoteTheme.hideSize)
+                        if hideButtonHovering {
+                            // Stoplight-style minus glyph appears on hover, mirroring macOS.
+                            Rectangle()
+                                .fill(Color.black.opacity(0.55))
+                                .frame(width: 4, height: 1)
+                        }
+                    }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, NoteTheme.closeInset)
-                // Keep the close-button hover from firing the strip's "false"
-                // path (debounce already handles it, but this is belt-and-braces).
-                .onHover(perform: handleHover)
+                .padding(.trailing, NoteTheme.hideInset)
+                .onHover { hovering in
+                    hideButtonHovering = hovering
+                    handleHover(hovering)
+                }
+                .help("Hide note")
             }
             .opacity(topBarHovering ? 0.9 : 0)
             .allowsHitTesting(topBarHovering)

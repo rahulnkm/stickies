@@ -7,6 +7,7 @@ struct Note: Codable, Identifiable, Equatable {
     var text: String
     var frame: NoteFrame
     var tintStyle: NoteTintStyle
+    var isHidden: Bool
     var createdAt: Date
     var updatedAt: Date
 
@@ -14,19 +15,21 @@ struct Note: Codable, Identifiable, Equatable {
          text: String = "",
          frame: NoteFrame,
          tintStyle: NoteTintStyle = .slate,
+         isHidden: Bool = false,
          createdAt: Date = .init(),
          updatedAt: Date = .init()) {
-        self.schemaVersion = 1
+        self.schemaVersion = 2
         self.id = id
         self.text = text
         self.frame = frame
         self.tintStyle = tintStyle
+        self.isHidden = isHidden
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 
     enum CodingKeys: String, CodingKey {
-        case schemaVersion, id, text, frame, tintStyle, createdAt, updatedAt
+        case schemaVersion, id, text, frame, tintStyle, isHidden, createdAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -36,6 +39,7 @@ struct Note: Codable, Identifiable, Equatable {
         self.text = try c.decode(String.self, forKey: .text)
         self.frame = try c.decode(NoteFrame.self, forKey: .frame)
         self.tintStyle = (try? c.decode(NoteTintStyle.self, forKey: .tintStyle)) ?? .slate
+        self.isHidden = (try? c.decode(Bool.self, forKey: .isHidden)) ?? false
         self.createdAt = try c.decode(Date.self, forKey: .createdAt)
         self.updatedAt = try c.decode(Date.self, forKey: .updatedAt)
     }
@@ -64,10 +68,10 @@ enum NoteTintStyle: String, Codable, CaseIterable {
     /// Opacity of the dark tint overlay on top of the system blur.
     var tintOpacity: Double {
         switch self {
-        case .mist:     return 0.20
-        case .smoke:    return 0.40
-        case .slate:    return 0.70
-        case .obsidian: return 0.85
+        case .mist:     return 0.00
+        case .smoke:    return 0.08
+        case .slate:    return 0.18
+        case .obsidian: return 0.38
         }
     }
 

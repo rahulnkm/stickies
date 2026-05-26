@@ -13,12 +13,12 @@ final class NoteWindowController: NSWindowController, NSWindowDelegate {
 
     let noteID: UUID
     private unowned let store: NoteStore
-    private let onClose: (UUID) -> Void
+    private let onHide: (UUID) -> Void
 
-    init(noteID: UUID, store: NoteStore, onClose: @escaping (UUID) -> Void) {
+    init(noteID: UUID, store: NoteStore, onHide: @escaping (UUID) -> Void) {
         self.noteID = noteID
         self.store = store
-        self.onClose = onClose
+        self.onHide = onHide
 
         let initialFrame = store.notes.first(where: { $0.id == noteID })?.frame.cgRect
             ?? CGRect(x: 120, y: 340, width: 240, height: 240)
@@ -52,9 +52,9 @@ final class NoteWindowController: NSWindowController, NSWindowDelegate {
         let hosting = NSHostingView(rootView: NoteView(
             noteID: noteID,
             store: store,
-            onClose: { [weak self] in
+            onHide: { [weak self] in
                 guard let self else { return }
-                self.onClose(self.noteID)
+                self.onHide(self.noteID)
             }
         ))
         hosting.autoresizingMask = [.width, .height]

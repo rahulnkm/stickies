@@ -5,17 +5,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let store = NoteStore()
     private var controllers: [UUID: NoteWindowController] = [:]
     private var menuBar: MenuBarController!
+    private var manager: ManagerWindowController?
     private let undoToast = UndoToast()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         LaunchAtLogin.reconcile()
 
-        menuBar = MenuBarController(onNewNote: { [weak self] in
-            self?.createNote()
-        })
+        menuBar = MenuBarController(
+            store: store,
+            onNewNote: { [weak self] in self?.createNote() },
+            onToggleVisibility: { [weak self] id in self?.toggleVisibility(id: id) },
+            onOpenManager: { [weak self] in self?.openManager() }
+        )
 
-        for note in store.notes {
+        for note in store.visibleNotes {
             openWindow(for: note.id)
         }
     }
@@ -35,6 +39,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openWindow(for: note.id)
     }
 
+    func toggleVisibility(id: UUID) {
+        guard let note = store.notes.first(where: { $0.id == id }) else { return }
+        if note.isHidden {
+            showNote(id: id)
+        } else {
+            hideNote(id: id)
+        }
+    }
+
+    func hideNote(id: UUID) {
+        // Persist final frame before tear-down so Show restores the exact position.
+        controllers[id]?.close(persistFrame: true)
+        controllers.removeValue(forKey: id)
+        store.hide(id: id)
+    }
+
+    func showNote(id: UUID) {
+        store.unhide(id: id)
+        openWindow(for: id)
+    }
+
+    func deleteForever(id: UUID) {
+        // Close any open window, mark deletion, fire undo toast.
+        controllers[id]?.close(persistFrame: true)
+        controllers.removeValue(forKey: id)
+        store.beginDelete(id: id)
+
+        undoToast.show(message: "Note deleted") { [weak self] outcome in
+            guard let self else { return }
+            switch outcome {
+            case .undone:
+                if let restored = self.store.undelete(id: id) {
+                    if !restored.isHidden {
+                        self.openWindow(for: id)
+                    }
+                }
+            case .expired:
+                self.store.commitDelete(id: id)
+            }
+        }
+    }
+
+    func openManager() {
+        if let manager {
+            manager.show()
+            return
+        }
+        let mgr = ManagerWindowController(
+            store: store,
+            onToggleVisibility: { [weak self] id in self?.toggleVisibility(id: id) },
+            onDelete: { [weak self] id in self?.deleteForever(id: id) }
+        )
+        manager = mgr
+        mgr.onClosed = { [weak self] in self?.manager = nil }
+        mgr.show()
+    }
+
     // MARK: - Window management
 
     func openWindow(for id: UUID) {
@@ -42,8 +103,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controllers[id]?.show()
             return
         }
-        let wc = NoteWindowController(noteID: id, store: store) { [weak self] closedID in
-            self?.handleCloseRequested(id: closedID)
+        let wc = NoteWindowController(noteID: id, store: store) { [weak self] hiddenID in
+            self?.hideNote(id: hiddenID)
         }
         controllers[id] = wc
         wc.show()
@@ -52,25 +113,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func closeWindow(for id: UUID, persistFrame: Bool = true) {
         controllers[id]?.close(persistFrame: persistFrame)
         controllers.removeValue(forKey: id)
-    }
-
-    // MARK: - Delete with undo
-
-    private func handleCloseRequested(id: UUID) {
-        // Persist final frame before tear-down so undo restores the exact position.
-        closeWindow(for: id, persistFrame: true)
-        store.beginDelete(id: id)
-
-        undoToast.show { [weak self] outcome in
-            guard let self else { return }
-            switch outcome {
-            case .undone:
-                if self.store.undelete(id: id) != nil {
-                    self.openWindow(for: id)
-                }
-            case .expired:
-                self.store.commitDelete(id: id)
-            }
-        }
     }
 }

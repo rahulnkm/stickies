@@ -12,6 +12,9 @@ final class NoteStore: ObservableObject {
 
     @Published private(set) var notes: [Note] = []
 
+    var visibleNotes: [Note] { notes.filter { !$0.isHidden } }
+    var hiddenNotes: [Note] { notes.filter { $0.isHidden } }
+
     /// Notes deleted from `notes` but not yet removed from disk.
     private(set) var pendingDeletions: [UUID: Note] = [:]
 
@@ -50,6 +53,16 @@ final class NoteStore: ObservableObject {
         notes[idx].updatedAt = Date()
         scheduleWrite(for: id)
     }
+
+    func setHidden(id: UUID, _ hidden: Bool) {
+        guard let idx = notes.firstIndex(where: { $0.id == id }), notes[idx].isHidden != hidden else { return }
+        notes[idx].isHidden = hidden
+        notes[idx].updatedAt = Date()
+        scheduleWrite(for: id)
+    }
+
+    func hide(id: UUID) { setHidden(id: id, true) }
+    func unhide(id: UUID) { setHidden(id: id, false) }
 
     func beginDelete(id: UUID) {
         guard let idx = notes.firstIndex(where: { $0.id == id }) else { return }
@@ -90,7 +103,7 @@ final class NoteStore: ObservableObject {
         let startX = screen.minX + 80
         let startY = screen.maxY - size.height - 80
         let offset = Self.cascadeOffset
-        let n = CGFloat(notes.count)
+        let n = CGFloat(visibleNotes.count)
         var x = startX + n * offset
         var y = startY - n * offset
         if x + size.width > screen.maxX || y < screen.minY {
