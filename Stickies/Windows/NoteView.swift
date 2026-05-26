@@ -191,13 +191,17 @@ private struct NoteTextEditor: NSViewRepresentable {
         scroll.automaticallyAdjustsContentInsets = false
         scroll.contentInsets = .init()
 
-        let tv = NoteTextView(frame: .zero)
+        // Sensible non-zero initial size so the text container has a real width
+        // before autoresizing kicks in. Without this the first image insert
+        // sees lineFrag.width = 0 (or unbounded) and renders at native size.
+        let initialSize = NSSize(width: 200, height: 200)
+        let tv = NoteTextView(frame: NSRect(origin: .zero, size: initialSize))
         tv.minSize = NSSize(width: 0, height: 0)
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
-        tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        tv.textContainer?.containerSize = NSSize(width: initialSize.width, height: CGFloat.greatestFiniteMagnitude)
         tv.textContainer?.widthTracksTextView = true
         tv.textContainer?.lineFragmentPadding = 0
 
