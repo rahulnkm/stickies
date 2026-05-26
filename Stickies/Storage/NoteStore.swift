@@ -128,7 +128,7 @@ final class NoteStore: ObservableObject {
         if note.hasRichBody {
             let url = rtfdURL(for: id)
             if let wrapper = try? FileWrapper(url: url, options: []),
-               let body = try? NSAttributedString(rtfdFileWrapper: wrapper, documentAttributes: nil) {
+               let body = NSAttributedString(rtfdFileWrapper: wrapper, documentAttributes: nil) {
                 return NoteStore.upgradeAttachments(in: body)
             }
             logger.warning("RTFD load failed for \(id.uuidString, privacy: .public); falling back to plain text")
@@ -257,7 +257,7 @@ final class NoteStore: ObservableObject {
         do {
             let data = try encoder.encode(note)
             try data.write(to: tmp, options: .atomic)
-            try FileManager.default.replaceItemAt(jsonURL, withItemAt: tmp)
+            _ = try FileManager.default.replaceItemAt(jsonURL, withItemAt: tmp)
         } catch {
             logger.error("Write JSON failed for \(note.id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
             return
