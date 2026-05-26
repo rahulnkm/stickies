@@ -218,9 +218,16 @@ private struct NoteTextEditor: NSViewRepresentable {
         tv.typingAttributes = Self.typingAttributes()
         tv.delegate = context.coordinator
 
-        // Seed the body. The store has already promoted any RTFD-decoded
-        // attachments to FitWidthImageAttachment via upgradeAttachments(in:).
+        // Seed the body, then force default font/color across the whole range.
+        // - Plain-text bodies arrive with no attributes (Helvetica 12 black fallback).
+        // - RTFD-decoded bodies may carry whatever attributes the write-time editor
+        //   produced. Either way, the note's identity is Geist Mono + the off-white
+        //   palette; flatten everything to that.
         tv.textStorage?.setAttributedString(initialBody)
+        if let storage = tv.textStorage, storage.length > 0 {
+            storage.addAttributes(Self.typingAttributes(),
+                                  range: NSRange(location: 0, length: storage.length))
+        }
 
         scroll.documentView = tv
         return scroll
