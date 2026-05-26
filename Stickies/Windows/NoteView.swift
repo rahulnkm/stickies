@@ -188,20 +188,17 @@ private struct NoteTextEditor: NSViewRepresentable {
         scroll.backgroundColor = .clear
         scroll.hasVerticalScroller = false
         scroll.hasHorizontalScroller = false
+        scroll.horizontalScrollElasticity = .none
         scroll.automaticallyAdjustsContentInsets = false
         scroll.contentInsets = .init()
 
-        // Sensible non-zero initial size so the text container has a real width
-        // before autoresizing kicks in. Without this the first image insert
-        // sees lineFrag.width = 0 (or unbounded) and renders at native size.
-        let initialSize = NSSize(width: 200, height: 200)
-        let tv = NoteTextView(frame: NSRect(origin: .zero, size: initialSize))
+        let tv = NoteTextView(frame: .zero)
         tv.minSize = NSSize(width: 0, height: 0)
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
-        tv.textContainer?.containerSize = NSSize(width: initialSize.width, height: CGFloat.greatestFiniteMagnitude)
+        tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         tv.textContainer?.widthTracksTextView = true
         tv.textContainer?.lineFragmentPadding = 0
 
@@ -238,8 +235,21 @@ private struct NoteTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
-        // Intentional no-op: the NSTextView is the source of truth for the body
-        // in flight. External pushes would fight the user's cursor.
+        // Don't push body changes back into the text view (NSTextView owns the
+        // in-flight body), but DO keep the text view's width pinned to the
+        // scroll view's clip-view width. Without this the document view can
+        // grow wider than the visible area when a large image is inserted,
+        // producing horizontal overflow inside the sticky.
+        guard let tv = scroll.documentView as? NoteTextView else { return }
+        let targetWidth = scroll.contentView.bounds.width
+        guard targetWidth > 0, tv.frame.width != targetWidth else { return }
+        tv.setFrameSize(NSSize(width: targetWidth, height: tv.frame.height))
+        tv.textContainer?.containerSize = NSSize(width: targetWidth,
+                                                 height: CGFloat.greatestFiniteMagnitude)
+        tv.layoutManager?.invalidateLayout(
+            forCharacterRange: NSRange(location: 0, length: tv.textStorage?.length ?? 0),
+            actualCharacterRange: nil
+        )
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(onChange: onChange) }
