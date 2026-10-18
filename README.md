@@ -2,7 +2,7 @@
 
 A minimal, beautiful floating sticky-notes app for macOS. Built in public.
 
-- Frosted-glass dark notes, always on top.
+- Frosted-glass notes, always on top. Mist and Smoke are light glass with dark text; Slate and Obsidian are dark glass with white text.
 - Drag-from-anywhere window, native edge resize.
 - Hover-reveal tint picker (Mist / Smoke / Slate / Obsidian) and hide button.
 - Hidden notes live in a Manager window for restore or permanent delete.

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Titled `NSWindow` subclass that hides its title bar for a sticky-note look
@@ -14,6 +15,7 @@ final class NoteWindowController: NSWindowController, NSWindowDelegate {
     let noteID: UUID
     private unowned let store: NoteStore
     private let onHide: (UUID) -> Void
+    private var tintObserver: AnyCancellable?
 
     init(noteID: UUID, store: NoteStore, onHide: @escaping (UUID) -> Void) {
         self.noteID = noteID
@@ -59,6 +61,13 @@ final class NoteWindowController: NSWindowController, NSWindowDelegate {
         ))
         hosting.autoresizingMask = [.width, .height]
         window.contentView = hosting
+
+        // Pin the window light or dark to match the note's tint, so the AppKit
+        // text view's dynamic colours follow the surface, not the system.
+        tintObserver = store.$notes
+            .map { $0.first(where: { $0.id == noteID })?.tintStyle ?? .slate }
+            .removeDuplicates()
+            .sink { [weak window] tint in window?.appearance = tint.appearance }
 
         // Shadow recomputes from opaque content; poke it once after layout.
         DispatchQueue.main.async { [weak window] in window?.invalidateShadow() }

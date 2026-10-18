@@ -61,32 +61,24 @@ struct NoteFrame: Codable, Equatable {
     init(_ r: CGRect) { self.x = r.origin.x; self.y = r.origin.y; self.w = r.size.width; self.h = r.size.height }
 }
 
-/// How much the dark palette tints the frosted-glass background.
+/// The four surfaces, running light to dark. Two light ones carrying dark
+/// text, two dark ones carrying white. Appearance (material, overlay, colour
+/// scheme) lives with the view in `NoteView.swift`.
 /// Stored as a stable string so JSON on disk stays readable.
 enum NoteTintStyle: String, Codable, CaseIterable {
-    case mist       // lightest — barely tinted
-    case smoke      // light frosted
-    case slate      // default — balanced dark
-    case obsidian   // darkest — near-opaque
-
-    /// Opacity of the dark tint overlay on top of the system blur.
-    var tintOpacity: Double {
-        switch self {
-        case .mist:     return 0.00
-        case .smoke:    return 0.08
-        case .slate:    return 0.18
-        case .obsidian: return 0.38
-        }
-    }
+    case mist       // lightest glass, dark text
+    case smoke      // light glass, dark text
+    case slate      // default - dark glass, white text
+    case obsidian   // darkest, white text
 
     /// Swatch lightness used for the picker circles (0 = black, 1 = white).
     /// Darker note = darker swatch.
     var swatchLightness: Double {
         switch self {
-        case .mist:     return 0.92
-        case .smoke:    return 0.70
-        case .slate:    return 0.35
-        case .obsidian: return 0.15
+        case .mist:     return 0.97
+        case .smoke:    return 0.78
+        case .slate:    return 0.34
+        case .obsidian: return 0.11
         }
     }
 }

@@ -4,8 +4,6 @@ import AppKit
 enum NoteTheme {
     static let bg = Color(red: 0x2C/255, green: 0x2A/255, blue: 0x33/255)
     static let text = Color(red: 0xE8/255, green: 0xE3/255, blue: 0xD8/255)
-    static let nsBg = NSColor(red: 0x2C/255, green: 0x2A/255, blue: 0x33/255, alpha: 1)
-    static let nsText = NSColor(red: 0xE8/255, green: 0xE3/255, blue: 0xD8/255, alpha: 1)
     static let cornerRadius: CGFloat = 6
     static let innerPadding: CGFloat = 16
     static let topPadding: CGFloat = 30   // extra room so hover-reveal button doesn't collide with the first line
@@ -22,6 +20,51 @@ enum NoteTheme {
     static func font(size: CGFloat = fontSize) -> NSFont {
         NSFont(name: "GeistMono-Regular", size: size)
             ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+}
+
+/// Same surface logic as md's `TintStyle`.
+///
+/// A fixed off-white on a fixed dark scrim only works while something dark
+/// sits behind the glass. Here the surface is a system `Material` and the text
+/// is a dynamic system colour, so the window server resolves both against the
+/// real backdrop, and each tint pins its own colour scheme so surface and text
+/// can never come apart.
+extension NoteTintStyle {
+    /// Pins the surface light or dark. Dynamic text colours resolve against it.
+    var colorScheme: ColorScheme {
+        switch self {
+        case .mist, .smoke:     return .light
+        case .slate, .obsidian: return .dark
+        }
+    }
+
+    /// The AppKit side of `colorScheme`, set on the note's window so the
+    /// hosted `NSTextView` follows the surface too.
+    var appearance: NSAppearance? {
+        NSAppearance(named: colorScheme == .light ? .aqua : .darkAqua)
+    }
+
+    /// The frosted layer itself. A system `Material` rather than a colour over
+    /// a blur: the window server knows what is behind the glass and blends
+    /// against it, which keeps text legible over an unknown backdrop.
+    var material: Material {
+        switch self {
+        case .mist:     return .ultraThinMaterial
+        case .smoke:    return .thinMaterial
+        case .slate:    return .regularMaterial
+        case .obsidian: return .thickMaterial
+        }
+    }
+
+    /// `NoteTheme.bg` over the darker glass, so Obsidian is the original dark
+    /// rather than whatever the system material resolves to.
+    var overlay: Color? {
+        switch self {
+        case .obsidian: return NoteTheme.bg.opacity(0.82)
+        case .slate:    return NoteTheme.bg.opacity(0.30)
+        case .mist, .smoke: return nil
+        }
     }
 }
 
@@ -53,10 +96,11 @@ struct NoteView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Translucent background: native blur + dark tint at the selected opacity.
-            BlurView(material: .hudWindow, blendingMode: .behindWindow)
-            RoundedRectangle(cornerRadius: NoteTheme.cornerRadius, style: .continuous)
-                .fill(NoteTheme.bg.opacity(currentTint.tintOpacity))
+            // Vibrancy, not a painted colour: see `NoteTintStyle.material`.
+            Rectangle().fill(currentTint.material)
+            if let overlay = currentTint.overlay {
+                Rectangle().fill(overlay)
+            }
 
             NoteTextEditor(
                 initialBody: store.body(for: noteID),
@@ -76,6 +120,8 @@ struct NoteView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: NoteTheme.cornerRadius, style: .continuous))
         .ignoresSafeArea()
+        // Each surface pins its own scheme, so text always matches the glass.
+        .environment(\.colorScheme, currentTint.colorScheme)
     }
 
     private var topBar: some View {
@@ -140,7 +186,7 @@ private struct TintSwatch: View {
                 .fill(Color(white: style.swatchLightness))
                 .frame(width: 8, height: 8)
                 .overlay(
-                    Circle().stroke(NoteTheme.text, lineWidth: isSelected ? 1.0 : 0)
+                    Circle().stroke(Color.primary, lineWidth: isSelected ? 1.0 : 0)
                 )
                 // Tight horizontal gap (~6pt between circles); vertical padding
                 // keeps the hit target tall enough for easy clicks.
@@ -149,29 +195,6 @@ private struct TintSwatch: View {
         }
         .buttonStyle(.plain)
         .help(style.rawValue.capitalized)
-    }
-}
-
-/// Native macOS vibrancy behind the note, so the dark palette reads as a
-/// translucent frosted pane over the desktop / windows behind.
-private struct BlurView: NSViewRepresentable {
-    let material: NSVisualEffectView.Material
-    let blendingMode: NSVisualEffectView.BlendingMode
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.material = material
-        v.blendingMode = blendingMode
-        v.state = .active
-        v.wantsLayer = true
-        v.layer?.cornerRadius = NoteTheme.cornerRadius
-        v.layer?.masksToBounds = true
-        return v
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = material
-        nsView.blendingMode = blendingMode
     }
 }
 
@@ -208,8 +231,8 @@ private struct NoteTextEditor: NSViewRepresentable {
         tv.allowsUndo = true
         tv.drawsBackground = false
         tv.backgroundColor = .clear
-        tv.textColor = NoteTheme.nsText
-        tv.insertionPointColor = NoteTheme.nsText
+        tv.textColor = .labelColor
+        tv.insertionPointColor = .labelColor
         tv.font = NoteTheme.font()
         tv.textContainerInset = .zero
         tv.isAutomaticQuoteSubstitutionEnabled = false
@@ -222,8 +245,8 @@ private struct NoteTextEditor: NSViewRepresentable {
         // Seed the body, then force default font/color across the whole range.
         // - Plain-text bodies arrive with no attributes (Helvetica 12 black fallback).
         // - RTFD-decoded bodies may carry whatever attributes the write-time editor
-        //   produced. Either way, the note's identity is Geist Mono + the off-white
-        //   palette; flatten everything to that.
+        //   produced. Either way, the note's identity is Geist Mono + the tint's
+        //   label colour; flatten everything to that.
         tv.textStorage?.setAttributedString(initialBody)
         if let storage = tv.textStorage, storage.length > 0 {
             storage.addAttributes(Self.typingAttributes(),
@@ -259,7 +282,8 @@ private struct NoteTextEditor: NSViewRepresentable {
         para.lineHeightMultiple = NoteTheme.lineHeightMultiple
         return [
             .font: NoteTheme.font(),
-            .foregroundColor: NoteTheme.nsText,
+            // Dynamic, so text flips with the tint's colour scheme.
+            .foregroundColor: NSColor.labelColor,
             .paragraphStyle: para,
             .kern: NoteTheme.tracking,
             // Disable ligatures so Geist Mono doesn't collapse `...` into a
